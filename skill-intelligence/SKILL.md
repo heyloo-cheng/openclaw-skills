@@ -206,3 +206,66 @@ When skill-router runs:
 
 All agents write to the same `skill-usage-log.jsonl`.
 Learning insights are shared — if coder learns that Swift projects prefer Claude Code, thinker also knows this when estimating Swift tasks.
+
+### Auto-Delegation Learning
+
+Track cross-agent delegation patterns in `skill-usage-log.jsonl`:
+
+```json
+{
+  "type": "delegation",
+  "from_agent": "writer",
+  "to_agent": "coder",
+  "skill_category": "code",
+  "timestamp": "2026-02-27T15:00:00Z",
+  "user_approved": true
+}
+```
+
+Rules:
+- Same delegation pattern 3+ times with user approval → auto-delegate next time
+- Store learned rules in `~/.openclaw/workspace/data/skill-auto-delegations.json`:
+```json
+{
+  "writer→coder": {"categories": ["code", "ops"], "auto": true, "count": 5},
+  "main→coder": {"categories": ["code"], "auto": false, "count": 2}
+}
+```
+- Auto-delegation message: "🔄 自动转给 [agent] 处理（基于历史偏好）"
+
+---
+
+## Module D: Monthly Report (Cron)
+
+### Setup
+
+Create cron job for monthly report (每月 1 号 9:00):
+
+```bash
+openclaw cron create --schedule "0 9 1 * *" --agent main --prompt "生成 skill 月度使用报告并发送到飞书主 Agent 私聊"
+```
+
+### Report Generation
+
+Read `skill-usage-log.jsonl`, aggregate by month:
+
+1. Total executions
+2. Top 5 most used skills
+3. Per-skill success rate
+4. Unused skills list
+5. Trend vs last month
+6. Auto-trust upgrades (skills that earned auto-execute)
+7. Delegation patterns
+
+### Delivery
+
+Send report to Feishu main agent DM (not group):
+```
+message tool:
+  channel: feishu
+  accountId: main
+  target: <user's feishu open_id>
+  message: <formatted report>
+```
+
+User's Feishu open_id: `ou_8067c16c778766946f5ccea50b3af738`

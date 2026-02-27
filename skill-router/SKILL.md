@@ -135,9 +135,31 @@ Apply weights based on environment:
 能再描述一下你想做什么吗？
 ```
 
+## Step 3.5: Conversation Context (Memory Chain)
+
+Before finalizing the match, check recent conversation (last 5 messages):
+
+- If user just discussed a bug/error → boost incident-router
+- If user just reviewed code → boost commit-message-router
+- If user just estimated a task → boost coding-agent
+- If user said "帮我处理一下" / "继续" / "接着做" → infer from previous topic
+
+This allows vague follow-ups like "帮我处理" to resolve correctly without asking.
+
+## Step 3.6: Progressive Trust (Auto-Execute)
+
+Read `~/.openclaw/workspace/data/skill-usage-log.jsonl` for the matched skill:
+
+- Count consecutive accepted executions (user_accepted=true, user_modified=false)
+- If count >= 10 AND success_rate >= 90% → auto-execute without confirmation
+- If count >= 5 AND success_rate >= 80% → show recommendation but auto-execute after 5s
+- Otherwise → ask for confirmation as normal
+
+Trust levels are per-skill, per-agent. Reset if user rejects or modifies output.
+
 ## Step 4: Execute Selected Skill
 
-Once user confirms, load and follow the selected skill's SKILL.md.
+Once user confirms (or auto-execute triggers), load and follow the selected skill's SKILL.md.
 
 ## Step 5: Log Usage
 
