@@ -1,152 +1,275 @@
 /**
- * context-engine: Topic-based dynamic context loading for OpenClaw
+ * Context Engine v1.0 — Main Plugin Entry
+ * Fuses xMemory (4-layer hierarchy) + MemWeaver (user profiling)
  * 
- * Inspired by virtual-context's 3-layer architecture:
- * - Layer 0: Active turns (in context window)
- * - Layer 1: Topic segment summaries (compressed)
- * - Layer 2: Tag summaries (bird's-eye view)
- * 
- * Uses before_prompt_build hook to dynamically load only relevant context.
+ * Hooks:
+ *   before_prompt_build → top-down retrieval → inject systemPrompt
+ *   agent_end → build episodes → extract semantics → assign themes
  */
 
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type OpenClawPluginApi = any;
+import type { ContextEngineConfig, Message, Episode, RetrievalTrace } from "./types.js";
+import { DEFAULT_CONFIG } from "./types.js";
+import { StorageLayer } from "./layers/storage.js";
+import { EpisodeBuilder } from "./layers/episode-builder.js";
+import { SemanticExtractor } from "./layers/semantic-extractor.js";
+import { ThemeManager } from "./layers/theme-manager.js";
+import { TopDownRetriever } from "./layers/retriever.js";
+import { UserProfiler } from "./layers/user-profiler.js";
+import { embedSingle } from "./utils/embedding.js";
 
-// --- Types ---
-
-interface TopicEntry {
-  tag: string;
-  summary: string;
-  messageCount: number;
-  lastSeen: number;
-  tokens: number;
-}
-
-interface TopicStore {
-  topics: Map<string, TopicEntry>;
-  currentTopic: string | null;
-}
-
-// --- Topic Classification ---
-
-const TOPIC_PATTERNS: Record<string, RegExp[]> = {
-  coding: [/代码|code|bug|fix|refactor|review|commit|git|deploy|test|编程|开发|重构/i],
-  config: [/配置|config|设置|setting|plugin|插件|install|安装/i],
-  memory: [/记忆|memory|lancedb|recall|store|记录/i],
-  skill: [/skill|技能|router|路由|trigger|触发/i],
-  agent: [/agent|委派|delegate|thinker|coder|writer|artist/i],
-  security: [/安全|security|audit|审计|secureclaw|权限/i],
-  search: [/搜索|search|查找|find|github|reddit/i],
-  planning: [/计划|plan|roadmap|路线|phase|阶段/i],
-  chat: [/聊天|chat|闲聊|你好|hi|hello/i],
-};
-
-function classifyTopic(prompt: string): string {
-  for (const [topic, patterns] of Object.entries(TOPIC_PATTERNS)) {
-    for (const p of patterns) {
-      if (p.test(prompt)) return topic;
-    }
-  }
-  return "general";
-}
-
-// --- Summary Generation ---
-
-function generateTopicSummary(messages: unknown[], topic: string): string {
-  // Extract text from messages related to this topic
-  const relevant: string[] = [];
-  for (const msg of messages) {
-    const m = msg as Record<string, unknown>;
-    const content = String(m.content || "");
-    if (classifyTopic(content) === topic) {
-      const role = String(m.role || "unknown");
-      relevant.push(`[${role}] ${content.slice(0, 200)}`);
-    }
-  }
-  if (relevant.length === 0) return "";
-  // Keep last 3 exchanges as summary
-  const kept = relevant.slice(-6);
-  return `[Topic: ${topic}] ${kept.length} recent exchanges:\n${kept.join("\n")}`;
-}
-
-// --- Plugin ---
-
-const store: TopicStore = {
-  topics: new Map(),
-  currentTopic: null,
-};
+// --- State ---
+let storage: StorageLayer | null = null;
+let episodeBuilder: EpisodeBuilder | null = null;
+let semanticExtractor: SemanticExtractor | null = null;
+let themeManager: ThemeManager | null = null;
+let retriever: TopDownRetriever | null = null;
+let userProfiler: UserProfiler | null = null;
+let config: ContextEngineConfig = { ...DEFAULT_CONFIG };
+let initialized = false;
+const traces: RetrievalTrace[] = [];
 
 export default function contextEngine(api: OpenClawPluginApi) {
   const logger = api.logger;
-  logger.info("[context-engine] v0.1.0 initializing — topic-based dynamic context loading");
+  logger.info("[context-engine] v1.0.0 initializing — xMemory + MemWeaver fusion");
 
-  // Hook: before_prompt_build
-  // Fires before the system prompt is assembled.
-  // We classify the current message's topic, then inject only relevant context.
-  api.on("before_prompt_build", (event, ctx) => {
-    const { prompt, messages } = event;
-    const currentTopic = classifyTopic(prompt);
-    const previousTopic = store.currentTopic;
+  // Resolve config
+  const pluginConfig = (api as unknown as Record<string, unknown>).config as Partial<ContextEngineConfig> || {};
+  config = { ...DEFAULT_CONFIG, ...pluginConfig };
 
-    // Topic switch detected
-    if (previousTopic && previousTopic !== currentTopic) {
-      logger.info(`[context-engine] Topic switch: ${previousTopic} → ${currentTopic}`);
+  // Resolve paths
+  if (!config.dbPath) {
+    config.dbPath = process.env.LANCEDB_PATH || `${process.env.HOME}/.openclaw/memory/lancedb-pro`;
+  }
+  if (!config.jinaApiKey) {
+    config.jinaApiKey = process.env.JINA_API_KEY || "";
+  }
 
-      // Compress the old topic into a summary
-      const oldSummary = generateTopicSummary(messages, previousTopic);
-      if (oldSummary) {
-        store.topics.set(previousTopic, {
-          tag: previousTopic,
-          summary: oldSummary,
-          messageCount: messages.length,
-          lastSeen: Date.now(),
-          tokens: oldSummary.length / 4, // rough estimate
-        });
-      }
+  if (!config.enabled) {
+    logger.info("[context-engine] Disabled by config");
+    return;
+  }
+
+  // --- Lazy Init ---
+  async function ensureInit(): Promise<boolean> {
+    if (initialized) return true;
+    if (!config.jinaApiKey) {
+      logger.warn("[context-engine] No Jina API key, skipping init");
+      return false;
     }
+    try {
+      storage = new StorageLayer(config.dbPath);
+      await storage.init();
 
-    store.currentTopic = currentTopic;
+      episodeBuilder = new EpisodeBuilder({
+        batchSize: config.episodeBatchSize,
+        jinaApiKey: config.jinaApiKey,
+      });
 
-    // Build dynamic context: only inject if there are inactive topics with summaries
-    const inactiveTopics: string[] = [];
-    for (const [tag, entry] of store.topics) {
-      if (tag !== currentTopic && entry.summary) {
-        const oneLiner = entry.summary.split("\n")[0];
-        inactiveTopics.push(`- [${tag}] ${oneLiner} (${entry.messageCount} msgs)`);
-      }
+      semanticExtractor = new SemanticExtractor({
+        jinaApiKey: config.jinaApiKey,
+      });
+
+      themeManager = new ThemeManager({
+        jinaApiKey: config.jinaApiKey,
+      });
+
+      retriever = new TopDownRetriever({
+        storage,
+        tokenBudget: config.tokenBudget,
+      });
+
+      userProfiler = new UserProfiler({
+        jinaApiKey: config.jinaApiKey,
+      });
+
+      initialized = true;
+      const stats = await storage.getStats();
+      logger.info(`[context-engine] Initialized. Tables: ${JSON.stringify(stats)}`);
+      return true;
+    } catch (err) {
+      logger.warn(`[context-engine] Init failed: ${err}`);
+      return false;
     }
+  }
 
-    // Inject into systemPrompt (invisible to user) instead of prependContext
-    if (inactiveTopics.length > 0) {
-      logger.info(`[context-engine] Injecting ${inactiveTopics.length} compressed topic(s) into systemPrompt, active: ${currentTopic}`);
+  // --- LLM Helper ---
+  // Uses the agent's own LLM for cheap calls (haiku-level)
+  function createLlmCall(ctx: unknown): (prompt: string) => Promise<string> {
+    return async (prompt: string) => {
+      // Try to use the plugin API's LLM access
+      const apiAny = api as unknown as Record<string, unknown>;
+      if (typeof apiAny.llm === "function") {
+        return await (apiAny.llm as (p: string) => Promise<string>)(prompt);
+      }
+      // Fallback: return empty (graceful degradation)
+      logger.warn("[context-engine] No LLM access, returning empty");
+      return "";
+    };
+  }
+
+  // ================================================================
+  // Hook: before_prompt_build — Top-down retrieval → inject systemPrompt
+  // ================================================================
+  api.on("before_prompt_build", async (event: any, ctx: any) => {
+    if (!(await ensureInit()) || !retriever || !storage) return undefined;
+
+    const { prompt } = event;
+    if (!prompt || prompt.length < 4) return undefined;
+
+    try {
+      // Embed the query
+      const queryEmbedding = await embedSingle(prompt, config.jinaApiKey, "query");
+
+      // Two-stage retrieval
+      const llmCall = createLlmCall(ctx);
+      const result = await retriever.retrieve(queryEmbedding, prompt, llmCall);
+
+      if (result.semantics.length === 0 && result.themes.length === 0) {
+        return undefined;
+      }
+
+      // Build systemPrompt injection
+      const parts: string[] = [];
+
+      // 1. Theme overview (~50 tokens)
+      if (result.themes.length > 0) {
+        parts.push("## Active Context");
+        parts.push(`Current topics: ${result.themes.map(t => t.name).join(", ")}`);
+      }
+
+      // 2. User profile (~100 tokens)
+      const profile = await storage.getLatestProfile("default");
+      if (profile?.global_profile) {
+        parts.push("## User Profile");
+        parts.push(profile.global_profile);
+      }
+
+      // 3. Semantic facts (~150 tokens)
+      if (result.semantics.length > 0) {
+        parts.push("## Relevant Facts");
+        for (const s of result.semantics.slice(0, 8)) {
+          parts.push(`- ${s.content}`);
+        }
+      }
+
+      // 4. Episode details (if expanded, ~200 tokens)
+      if (result.episodes.length > 0) {
+        parts.push("## Details");
+        for (const e of result.episodes.slice(0, 3)) {
+          parts.push(`- ${e.summary}`);
+        }
+      }
+
+      // Store trace for observability
+      const trace = retriever.buildTrace(prompt, result);
+      traces.push(trace);
+      if (traces.length > 100) traces.shift(); // Keep last 100
+
+      logger.info(
+        `[context-engine] Injected: ${result.themes.length} themes, ` +
+        `${result.semantics.length} semantics, ${result.episodes.length} episodes, ` +
+        `~${result.total_tokens} tokens, decision=${result.stage2_decision}`
+      );
+
       return {
-        systemPrompt:
-          `\n## Active Context\n` +
-          `Current topic: ${currentTopic}\n` +
-          `Compressed inactive topics:\n` +
-          inactiveTopics.join("\n"),
+        systemPrompt: "\n" + parts.join("\n"),
       };
+    } catch (err) {
+      logger.warn(`[context-engine] Retrieval error: ${err}`);
+      return undefined;
     }
-
-    return undefined;
   });
 
-  // Hook: llm_output — track topic after each response
-  api.on("llm_output", (event, ctx) => {
-    const texts = event.assistantTexts || [];
-    if (texts.length > 0 && store.currentTopic) {
-      const existing = store.topics.get(store.currentTopic);
-      if (existing) {
-        existing.lastSeen = Date.now();
-        existing.messageCount++;
+  // ================================================================
+  // Hook: agent_end — Build episodes → extract semantics → assign themes
+  // ================================================================
+  api.on("agent_end", async (event: any, ctx: any) => {
+    if (!(await ensureInit()) || !episodeBuilder || !semanticExtractor || !themeManager || !storage) return;
+
+    try {
+      const messages: Message[] = ((event as Record<string, unknown>).messages as Message[]) || [];
+      if (messages.length === 0) return;
+
+      // Add messages to episode builder
+      for (const msg of messages) {
+        episodeBuilder.addMessage(msg);
       }
+
+      // Flush if we have enough messages
+      if (!episodeBuilder.hasPending()) return;
+
+      const llmCall = createLlmCall(ctx);
+      const episode = await episodeBuilder.flush(llmCall);
+      if (!episode) return;
+
+      // Store episode
+      await storage.addEpisode(episode as Episode & { embedding: number[] });
+      logger.info(`[context-engine] Episode created: ${episode.episode_id} (${episode.message_count} msgs)`);
+
+      // Extract semantics from episode
+      const existingSemantics = await storage.searchSemantics(
+        (episode as Episode & { embedding: number[] }).embedding, 20
+      );
+      const newSemantics = await semanticExtractor.extract(
+        episode, existingSemantics, llmCall
+      );
+
+      // Assign each semantic to a theme
+      const allThemes = await storage.getAllThemes();
+      for (const semantic of newSemantics) {
+        const { themeId, isNew, newTheme } = await themeManager.assignToTheme(
+          semantic, allThemes, llmCall
+        );
+
+        semantic.theme_id = themeId;
+        await storage.addSemantic(semantic);
+
+        if (isNew && newTheme) {
+          await storage.addTheme(newTheme);
+          allThemes.push(newTheme);
+          logger.info(`[context-engine] New theme: "${newTheme.name}" (${newTheme.theme_id})`);
+        } else {
+          // Update existing theme's semantic_ids
+          const theme = allThemes.find(t => t.theme_id === themeId);
+          if (theme) {
+            theme.semantic_ids.push(semantic.semantic_id);
+            theme.message_count++;
+            theme.last_active = Date.now();
+            await storage.updateTheme(themeId, {
+              semantic_ids: theme.semantic_ids,
+              message_count: theme.message_count,
+              last_active: theme.last_active,
+            });
+
+            // Check if theme needs splitting
+            if (themeManager.shouldSplit(theme)) {
+              const themeSems = await storage.getSemanticsByTheme(themeId);
+              const semsWithEmbed = themeSems.filter(s => s.embedding) as (typeof newSemantics[0])[];
+              if (semsWithEmbed.length > 0) {
+                const { theme1, theme2 } = await themeManager.splitTheme(
+                  theme, semsWithEmbed, llmCall
+                );
+                await storage.addTheme(theme1);
+                await storage.addTheme(theme2);
+                logger.info(`[context-engine] Theme split: "${theme.name}" → "${theme1.name}" + "${theme2.name}"`);
+              }
+            }
+          }
+        }
+
+        logger.info(`[context-engine] Semantic: "${semantic.content.slice(0, 40)}..." → theme ${themeId}`);
+      }
+
+      // Update kNN graph
+      const updatedThemes = await storage.getAllThemes();
+      themeManager.updateKNN(updatedThemes);
+
+    } catch (err) {
+      logger.warn(`[context-engine] Build error: ${err}`);
     }
   });
 
-  // Hook: before_compaction — save all topic summaries before compaction wipes history
-  api.on("before_compaction", (event, ctx) => {
-    logger.info(`[context-engine] Pre-compaction: saving ${store.topics.size} topic summaries`);
-    // Topics are already in memory store, they survive compaction
-  });
-
-  logger.info(`[context-engine] Registered hooks: before_prompt_build, llm_output, before_compaction`);
+  logger.info("[context-engine] v1.0.0 registered: before_prompt_build + agent_end hooks");
 }

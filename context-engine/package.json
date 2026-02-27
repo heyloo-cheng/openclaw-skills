@@ -1,21 +1,21 @@
 {
-  "name": "context-engine",
-  "version": "0.1.0",
-  "description": "OpenClaw context engine plugin — topic-based dynamic context loading via before_prompt_build hook",
+  "name": "context-engine-v1",
+  "version": "1.0.0",
+  "description": "Context Engine v1.0 — xMemory + MemWeaver fusion for OpenClaw. 4-layer hierarchical memory with top-down retrieval.",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "node --test tests/"
   },
   "openclaw": {
     "type": "extension",
-    "extensions": [
-      "./dist/index.js"
-    ]
+    "extensions": ["./dist/index.js"]
   },
-  "license": "MIT",
   "devDependencies": {
-    "openclaw": "^2026.2.26",
-    "typescript": "^5.9.3"
-  }
+    "typescript": "^5.4.0",
+    "@types/node": "^22.0.0"
+  },
+  "license": "MIT"
 }
