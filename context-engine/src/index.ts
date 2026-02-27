@@ -106,25 +106,24 @@ export default function contextEngine(api: OpenClawPluginApi) {
 
     store.currentTopic = currentTopic;
 
-    // Build dynamic context: current topic full + other topics as 1-line summaries
-    const contextParts: string[] = [];
-    contextParts.push(`<context-engine topic="${currentTopic}">`);
-
-    // Add summaries of other topics (compressed)
+    // Build dynamic context: only inject if there are inactive topics with summaries
+    const inactiveTopics: string[] = [];
     for (const [tag, entry] of store.topics) {
       if (tag !== currentTopic && entry.summary) {
-        // Only include 1-line summary for non-active topics
         const oneLiner = entry.summary.split("\n")[0];
-        contextParts.push(`  [${tag}] ${oneLiner} (${entry.messageCount} msgs, last: ${new Date(entry.lastSeen).toLocaleTimeString()})`);
+        inactiveTopics.push(`- [${tag}] ${oneLiner} (${entry.messageCount} msgs)`);
       }
     }
 
-    contextParts.push("</context-engine>");
-
-    // Only prepend if we have compressed topics
-    if (store.topics.size > 0) {
+    // Inject into systemPrompt (invisible to user) instead of prependContext
+    if (inactiveTopics.length > 0) {
+      logger.info(`[context-engine] Injecting ${inactiveTopics.length} compressed topic(s) into systemPrompt, active: ${currentTopic}`);
       return {
-        prependContext: contextParts.join("\n"),
+        systemPrompt:
+          `\n## Active Context\n` +
+          `Current topic: ${currentTopic}\n` +
+          `Compressed inactive topics:\n` +
+          inactiveTopics.join("\n"),
       };
     }
 
