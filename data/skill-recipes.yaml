@@ -1,0 +1,82 @@
+recipes:
+  release:
+    name: "发版流程"
+    triggers: ["发版", "release", "上线", "发布"]
+    steps:
+      - skill: test-generator-router
+        desc: "确保测试覆盖"
+      - skill: code-review-router
+        desc: "代码审查"
+      - skill: commit-message-router
+        desc: "生成 commit message"
+      - skill: deploy-reviewer
+        desc: "部署配置检查"
+      - skill: doc-generator-router
+        desc: "生成 changelog"
+
+  new-feature:
+    name: "新功能开发"
+    triggers: ["新功能", "new feature", "开发新功能"]
+    steps:
+      - skill: task-estimator
+        desc: "评估工作量"
+      - skill: coding-agent
+        desc: "开发实现"
+      - skill: test-generator-router
+        desc: "生成测试"
+      - skill: code-review-router
+        desc: "代码审查"
+      - skill: commit-message-router
+        desc: "提交代码"
+
+  bugfix:
+    name: "修 Bug"
+    triggers: ["修bug", "bugfix", "fix bug", "修复bug"]
+    steps:
+      - skill: incident-router
+        desc: "定位问题"
+      - skill: coding-agent
+        desc: "修复代码"
+      - skill: test-generator-router
+        desc: "补充测试"
+      - skill: code-review-router
+        desc: "审查修复"
+      - skill: commit-message-router
+        desc: "提交"
+
+  refactor:
+    name: "重构"
+    triggers: ["重构", "refactor", "优化代码结构"]
+    steps:
+      - skill: refactor-planner
+        desc: "分析和规划"
+      - skill: test-generator-router
+        desc: "确保测试覆盖"
+      - skill: coding-agent
+        desc: "执行重构"
+      - skill: code-review-router
+        desc: "审查重构"
+      - skill: commit-message-router
+        desc: "提交"
+
+  documentation:
+    name: "文档更新"
+    triggers: ["写文档", "更新文档", "documentation"]
+    steps:
+      - skill: doc-generator-router
+        desc: "生成文档"
+      - skill: translation-router
+        desc: "翻译（如需要）"
+      - skill: commit-message-router
+        desc: "提交"
+
+  pr-review:
+    name: "PR 审查"
+    triggers: ["审查PR", "review PR", "PR流程"]
+    steps:
+      - skill: pr-reviewer-router
+        desc: "完整 PR 审查"
+      - skill: test-generator-router
+        desc: "检查测试覆盖"
+      - skill: deploy-reviewer
+        desc: "检查部署影响"

@@ -1,0 +1,17 @@
+#!/bin/bash
+# pre-push hook — push 前自动提醒 code review
+# 安装: cp this ~/.openclaw/workspace/skills/.git/hooks/pre-push && chmod +x
+
+BRANCH=$(git branch --show-current)
+CHANGED=$(git diff --numstat origin/$BRANCH..HEAD 2>/dev/null | awk '{s+=$1+$2}END{print s+0}')
+FILES=$(git diff --name-only origin/$BRANCH..HEAD 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$CHANGED" -gt 200 ] || [ "$FILES" -gt 10 ]; then
+  echo ""
+  echo "🔍 检测到较大变更 ($FILES 文件, $CHANGED 行)"
+  echo "   建议 push 前跑一次 code review"
+  echo "   说 'review my code' 或 '审查代码'"
+  echo ""
+  echo "   继续 push? (5秒后自动继续)"
+  sleep 5
+fi

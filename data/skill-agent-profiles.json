@@ -1,0 +1,36 @@
+{
+  "main": {
+    "preferred": ["general", "workflow", "lifestyle", "productivity"],
+    "boost": {},
+    "exclude": []
+  },
+  "coder": {
+    "preferred": ["code", "ops"],
+    "boost": {"code-review-router": 0.3, "test-generator-router": 0.3, "commit-message-router": 0.2, "refactor-planner": 0.2},
+    "exclude": ["weather", "spotify-player", "openhue", "goplaces", "eightctl"]
+  },
+  "writer": {
+    "preferred": ["content"],
+    "boost": {"doc-generator-router": 0.3, "translation-router": 0.3, "prose": 0.3, "summarize": 0.2},
+    "exclude": ["code-review-router", "deploy-reviewer", "incident-router", "test-generator-router"]
+  },
+  "thinker": {
+    "preferred": ["general", "code"],
+    "boost": {"task-estimator": 0.3, "refactor-planner": 0.2, "incident-router": 0.2},
+    "exclude": ["media", "lifestyle", "spotify-player", "openhue"]
+  },
+  "news": {
+    "preferred": [],
+    "exclude": ["*"]
+  },
+  "artist": {
+    "preferred": ["media"],
+    "boost": {"openai-image-gen": 0.3, "nano-banana-pro": 0.3},
+    "exclude": ["code", "ops", "deploy-reviewer", "test-generator-router"]
+  },
+  "cursor-ops": {
+    "preferred": ["code"],
+    "boost": {"cursor-agent": 0.5, "code-review-router": 0.2},
+    "exclude": ["content", "lifestyle", "media", "translation-router"]
+  }
+}
