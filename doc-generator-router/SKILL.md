@@ -1,6 +1,15 @@
 ---
 name: doc-generator-router
 description: Routes documentation generation based on code type — API docs, README, changelog, or inline comments. Use when you want to generate or update documentation.
+triggers:
+  - doc
+  - 文档
+  - readme
+  - changelog
+  - API文档
+  - 注释
+  - generate doc
+  - 写文档
 ---
 
 # Doc Generator Router

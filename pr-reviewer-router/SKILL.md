@@ -1,6 +1,13 @@
 ---
 name: pr-reviewer-router
 description: Comprehensive PR review including code quality, PR description, breaking changes, and linked issues. Use when reviewing a pull request.
+triggers:
+  - PR
+  - pull request
+  - 合并请求
+  - PR review
+  - merge request
+  - 审查PR
 ---
 
 # PR Reviewer Router

@@ -1,6 +1,16 @@
 ---
 name: incident-router
 description: Routes incident troubleshooting based on error log characteristics. Use when diagnosing errors, crashes, or system issues from logs.
+triggers:
+  - incident
+  - 故障
+  - 排查
+  - error
+  - 报错
+  - 崩溃
+  - crash
+  - debug
+  - 排错
 ---
 
 # Incident Router

@@ -1,6 +1,14 @@
 ---
 name: code-review-router
 description: Intelligently routes code reviews between OpenCode and Claude Code based on tech stack, complexity, and change characteristics. Use when you want an automated code review of your current changes.
+triggers:
+  - review
+  - code review
+  - 审查
+  - 代码检查
+  - 看看代码
+  - diff review
+  - 检查代码
 ---
 
 # Code Review Router

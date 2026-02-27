@@ -1,6 +1,14 @@
 ---
 name: test-generator-router
 description: Analyzes code changes and routes to the appropriate test generation strategy (unit, integration, or E2E). Use when you want to generate tests for your current changes.
+triggers:
+  - test
+  - 测试
+  - 生成测试
+  - 单元测试
+  - unit test
+  - 写测试
+  - 补测试
 ---
 
 # Test Generator Router

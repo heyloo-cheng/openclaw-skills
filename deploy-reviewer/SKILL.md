@@ -1,6 +1,14 @@
 ---
 name: deploy-reviewer
 description: Reviews CI/CD configs, Dockerfiles, and deployment manifests for risks and best practices. Use when reviewing infrastructure or deployment changes.
+triggers:
+  - deploy
+  - 部署
+  - 发布检查
+  - dockerfile
+  - k8s
+  - CI/CD
+  - 上线检查
 ---
 
 # Deploy Reviewer

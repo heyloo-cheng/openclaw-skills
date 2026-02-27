@@ -1,6 +1,15 @@
 ---
 name: task-estimator
 description: Estimates task complexity and time based on requirement description. Routes between quick estimation and detailed breakdown. Use when estimating effort for a coding task.
+triggers:
+  - estimate
+  - 估时
+  - 评估
+  - 工作量
+  - 多久
+  - complexity
+  - 排期
+  - 估算
 ---
 
 # Task Estimator

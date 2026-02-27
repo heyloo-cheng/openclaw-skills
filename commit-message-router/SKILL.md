@@ -1,6 +1,13 @@
 ---
 name: commit-message-router
 description: Intelligently generates commit messages based on change characteristics. Routes between concise format for small fixes and conventional commits with detailed body for larger changes. Use when you want to generate a commit message for your current changes.
+triggers:
+  - commit
+  - 提交
+  - commit message
+  - 提交信息
+  - git commit
+  - 写commit
 ---
 
 # Commit Message Router

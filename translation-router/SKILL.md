@@ -1,6 +1,14 @@
 ---
 name: translation-router
 description: Routes translation tasks based on content type — technical docs, marketing copy, or UI text. Use when translating content between languages.
+triggers:
+  - translate
+  - 翻译
+  - translation
+  - 中译英
+  - 英译中
+  - 本地化
+  - localize
 ---
 
 # Translation Router

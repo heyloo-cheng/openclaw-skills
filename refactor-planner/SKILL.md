@@ -1,6 +1,14 @@
 ---
 name: refactor-planner
 description: Analyzes code for smells and complexity, then routes to the appropriate refactoring strategy. Use when you want to refactor or improve code quality.
+triggers:
+  - refactor
+  - 重构
+  - 优化代码
+  - 代码质量
+  - code smell
+  - 坏味道
+  - 整理代码
 ---
 
 # Refactor Planner
