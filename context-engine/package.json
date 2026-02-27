@@ -1,0 +1,21 @@
+{
+  "name": "context-engine",
+  "version": "0.1.0",
+  "description": "OpenClaw context engine plugin — topic-based dynamic context loading via before_prompt_build hook",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "openclaw": {
+    "type": "extension",
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "openclaw": "^2026.2.26",
+    "typescript": "^5.9.3"
+  }
+}
