@@ -1,21 +1,19 @@
 #!/usr/bin/env node
 /**
  * Web Search Adapter
- * Placeholder for web search integration
- * Note: Actual web search should be called from the main agent context
+ * Uses web-search-proxy for direct Brave Search API calls
  */
 
+import { searchWeb as searchWebProxy, isAvailable as isProxyAvailable } from '../scripts/web-search-proxy.mjs';
+
 /**
- * Search the web (placeholder)
+ * Search the web
  * @param {string} query - Search query
  * @param {Object} options - Search options
  * @returns {Promise<Array>} Search results
  */
 export async function searchWeb(query, options = {}) {
-  // TODO: Implement web search via agent tool call
-  // For now, return empty results
-  console.warn('[web] Web search should be called from agent context');
-  return [];
+  return searchWebProxy(query, options);
 }
 
 /**
@@ -23,7 +21,7 @@ export async function searchWeb(query, options = {}) {
  * @returns {Promise<boolean>}
  */
 export async function isAvailable() {
-  return false; // Disabled until implemented properly
+  return isProxyAvailable();
 }
 
 export default { searchWeb, isAvailable };

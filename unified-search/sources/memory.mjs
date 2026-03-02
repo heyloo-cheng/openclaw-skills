@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Memory Search Adapter
- * Direct LanceDB access via vectordb package
+ * Direct LanceDB access via @lancedb/lancedb
  */
 
-import { connect } from 'vectordb';
+import * as lancedb from '@lancedb/lancedb';
 import { homedir } from 'os';
 import { join } from 'path';
 
@@ -22,24 +22,18 @@ export async function searchMemory(query, options = {}) {
   const minScore = options.minScore || 0.3;
   
   try {
-    // Connect to LanceDB
-    const db = await connect(DB_PATH);
+    // Connect to LanceDB (new API)
+    const db = await lancedb.connect(DB_PATH);
     
-    // Check if table exists
-    const tableNames = await db.tableNames();
-    if (!tableNames.includes(TABLE_NAME)) {
-      console.warn('[memory] Table not found:', TABLE_NAME);
-      return [];
-    }
-    
+    // Open table (new API)
     const table = await db.openTable(TABLE_NAME);
     
-    // Perform full-text search (FTS)
-    // LanceDB supports FTS on text columns
+    // Perform full-text search
+    // Note: .search() does FTS, .vectorSearch() does vector search
     const results = await table
       .search(query)
       .limit(limit * 3) // Get more candidates for filtering
-      .execute();
+      .toArray(); // New API: toArray() instead of execute()
     
     if (!results || results.length === 0) {
       return [];
@@ -52,7 +46,7 @@ export async function searchMemory(query, options = {}) {
         if (row._distance !== undefined) {
           // LanceDB returns distance, lower is better
           // Convert to similarity score (0-1)
-          const score = 1 / (1 + row._distance);
+          const score = Math.max(0, 1 - row._distance);
           return score >= minScore;
         }
         return true;
@@ -60,7 +54,7 @@ export async function searchMemory(query, options = {}) {
       .slice(0, limit)
       .map((row, index) => {
         const score = row._distance !== undefined 
-          ? Math.max(0, 1 - row._distance) // Distance to similarity
+          ? Math.max(0, 1 - row._distance)
           : 0.7 - index * 0.05;
         
         const text = row.text || row.content || '';
