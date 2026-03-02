@@ -1,0 +1,61 @@
+{
+  "version": "0.2.0",
+  "searchEngine": "lss",
+  "sources": {
+    "lss": {
+      "enabled": true,
+      "priority": 10,
+      "projectPaths": {
+        "toolbox": "~/projects/ToolBox",
+        "clipmind": "~/projects/ClipMind",
+        "vaultmind": "~/projects/VaultMind"
+      }
+    },
+    "memory": {
+      "enabled": true,
+      "priority": 9,
+      "limit": 5
+    },
+    "files": {
+      "enabled": true,
+      "priority": 8,
+      "searchPath": "~/.openclaw/workspace",
+      "limit": 5
+    },
+    "web": {
+      "enabled": true,
+      "priority": 7,
+      "limit": 5,
+      "fetchContent": true,
+      "freshness": null
+    }
+  },
+  "routing": {
+    "deepSearchKeywords": ["深度搜索", "deep search", "深搜", "详细调研", "research"],
+    "projectKeywords": ["ToolBox", "工具箱", "ClipMind", "剪贴板", "VaultMind", "知识库"],
+    "timeSensitiveKeywords": ["最新", "今天", "2026", "latest", "today", "recent"],
+    "memoryKeywords": ["记忆", "决策", "教训", "上次", "之前", "memory", "decision", "lesson"],
+    "codeKeywords": ["代码", "函数", "class", "API", "实现", "code", "function", "implementation"],
+    "thresholds": {
+      "minResults": 3,
+      "minScore": 0.5
+    }
+  },
+  "fallback": {
+    "enabled": true,
+    "strategy": "web",
+    "triggers": {
+      "lowResults": true,
+      "lowScore": true
+    }
+  },
+  "cache": {
+    "enabled": false,
+    "ttl": {
+      "lss": 3600,
+      "memory": 1800,
+      "files": 600,
+      "web": 600
+    }
+  }
+}
