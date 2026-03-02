@@ -9,6 +9,27 @@ import { search as searchLSS } from './sources/lss.mjs';
 import { searchMemory } from './sources/memory.mjs';
 import { searchFiles } from './sources/files.mjs';
 import { searchWeb } from './sources/web.mjs';
+import { getCached, setCached } from './cache.mjs';
+import { recordFeedback } from './feedback.mjs';
+import { readFile } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CONFIG_PATH = join(__dirname, 'config.json');
+
+/**
+ * Load configuration
+ */
+async function loadConfig() {
+  try {
+    const data = await readFile(CONFIG_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.warn('[unified-search] Failed to load config, using defaults');
+    return { cache: { enabled: false } };
+  }
+}
 
 /**
  * Main search function
@@ -19,6 +40,8 @@ import { searchWeb } from './sources/web.mjs';
 export async function search(query, options = {}) {
   const startTime = Date.now();
   const limit = options.limit || 5;
+  const config = await loadConfig();
+  const cacheEnabled = config.cache?.enabled ?? false;
   
   // Route the query
   const routing = routeQuery(query);
@@ -29,25 +52,46 @@ export async function search(query, options = {}) {
   console.log(`[unified-search] Routing: ${sources.join(' + ')} (confidence: ${confidence})`);
   console.log(`[unified-search] Reasoning: ${reasoning}`);
   
-  // Execute searches in parallel
+  // Execute searches in parallel with caching
   const searchPromises = sources.map(async (source) => {
     try {
+      // Check cache first
+      if (cacheEnabled) {
+        const cached = await getCached(source, query, { limit });
+        if (cached) {
+          return { source, results: cached, fromCache: true };
+        }
+      }
+      
+      // Execute search
+      let results;
       switch (source) {
         case 'lss':
-          return { source: 'lss', results: await searchLSS(query, { limit }) };
+          results = await searchLSS(query, { limit });
+          break;
         case 'memory':
-          return { source: 'memory', results: await searchMemory(query, { limit }) };
+          results = await searchMemory(query, { limit });
+          break;
         case 'files':
-          return { source: 'files', results: await searchFiles(query, { limit }) };
+          results = await searchFiles(query, { limit });
+          break;
         case 'web':
-          return { source: 'web', results: await searchWeb(query, { limit, fetchContent: true }) };
+          results = await searchWeb(query, { limit, fetchContent: true });
+          break;
         default:
           console.warn(`[unified-search] Unknown source: ${source}`);
-          return { source, results: [] };
+          results = [];
       }
+      
+      // Cache results
+      if (cacheEnabled && results.length > 0) {
+        await setCached(source, query, results, { limit });
+      }
+      
+      return { source, results, fromCache: false };
     } catch (error) {
       console.error(`[unified-search] ${source} search failed:`, error.message);
-      return { source, results: [] };
+      return { source, results: [], fromCache: false };
     }
   });
   
@@ -86,7 +130,7 @@ export async function search(query, options = {}) {
   
   const elapsedMs = Date.now() - startTime;
   
-  return {
+  const searchResponse = {
     query,
     results: finalResults,
     metadata: {
@@ -99,6 +143,13 @@ export async function search(query, options = {}) {
       timestamp: new Date().toISOString()
     }
   };
+  
+  // Auto-record feedback (async, don't wait)
+  recordFeedback(searchResponse, {
+    fallbackTriggered: false // TODO: detect fallback
+  }).catch(err => console.error('[feedback] Failed to record:', err.message));
+  
+  return searchResponse;
 }
 
 /**

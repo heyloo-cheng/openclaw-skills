@@ -50,7 +50,7 @@
     }
   },
   "cache": {
-    "enabled": false,
+    "enabled": true,
     "ttl": {
       "lss": 3600,
       "memory": 1800,
