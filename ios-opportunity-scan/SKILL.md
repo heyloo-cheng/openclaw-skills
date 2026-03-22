@@ -13,6 +13,14 @@ allowed-tools:
   - Glob
   - WebSearch
   - WebFetch
+
+## 搜索工具优先级
+优先使用 deep-search skill 进行深度搜索：
+```bash
+node ~/.openclaw/workspace/skills/deep-search/scripts/search-engine.mjs \
+  --query "查询词" --depth deep
+```
+deep-search 不可用时降级到 web_search + web_fetch。
 ---
 
 # iOS 开发方向从零调研工作流
