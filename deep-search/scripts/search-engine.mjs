@@ -42,13 +42,56 @@ async function exaSearch(query, depth) {
   const key = process.env.EXA_API_KEY;
   if (!key) throw new Error("EXA_API_KEY not set");
 
-  const typeMap = { quick: "auto", deep: "deep", max: "deep-max" };
+  // 正确的 Exa 搜索类型映射
+  // 参考: https://exa.ai/docs/reference/search
+  const typeMap = { 
+    quick: "auto",           // 快速搜索使用 auto (智能选择)
+    shallow: "auto",        // 浅层搜索使用 auto
+    deep: "deep",           // 深度搜索使用 deep
+    max: "deep-reasoning"   // 最大深度使用 deep-reasoning
+  };
+  
+  // 简化请求参数，避免复杂的 contents 配置导致问题
   const body = {
     query,
     type: typeMap[depth] || "auto",
-    numResults: depth === "quick" ? 5 : 10,
-    contents: { text: { maxCharacters: 2000 } },
+    numResults: depth === "quick" || depth === "shallow" ? 5 : 10,
   };
+  
+  // 检测查询类型并添加 category
+  const categoryMap = {
+    'research': 'research paper',
+    'paper': 'research paper',
+    'arxiv': 'research paper',
+    'news': 'news',
+    'company': 'company',
+    'linkedin': 'people',
+    'profile': 'people'
+  };
+  
+  for (const [keyword, category] of Object.entries(categoryMap)) {
+    if (query.toLowerCase().includes(keyword)) {
+      body.category = category;
+      break;
+    }
+  }
+  
+  // 只在明确的代码/库查询时添加域名过滤
+  // 避免过度限制导致无结果
+  const codeSpecificKeywords = ['github', 'repository', 'npm', 'pypi', 'package'];
+  const isCodeSpecific = codeSpecificKeywords.some(kw => query.toLowerCase().includes(kw));
+  
+  if (isCodeSpecific && !body.category) {
+    body.includeDomains = [
+      'github.com',
+      'docs.langchain.com',
+      'python.langchain.com',
+      'js.langchain.com',
+      'npmjs.com',
+      'pypi.org',
+      'stackoverflow.com'
+    ];
+  }
 
   const res = await fetch("https://api.exa.ai/search", {
     method: "POST",
@@ -57,14 +100,19 @@ async function exaSearch(query, depth) {
   });
 
   if (res.status === 429) throw new Error("Exa quota exceeded");
-  if (!res.ok) throw new Error(`Exa ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Exa ${res.status}: ${errorText}`);
+  }
 
   const data = await res.json();
+  
+  // 解析 Exa 返回的结果
   return (data.results || []).map(r => ({
     title: r.title || "",
     url: r.url || "",
-    content: r.text || r.summary || "",
-    score: r.score,
+    content: r.title || r.url || "",  // 简化：使用标题作为内容
+    score: 1,  // Exa 新版 API 不再返回 score
     source: "exa",
   }));
 }

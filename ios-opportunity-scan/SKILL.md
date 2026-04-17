@@ -3,7 +3,7 @@ name: ios-opportunity-scan
 description: |
   iOS 开发方向从零调研工作流。当用户没有明确 App 方向，想通过数据决策时激活。
   触发词：「帮我做 iOS 开发方向调研」「iOS 软件调查」「不知道做什么 App」「帮我找 iOS 开发方向」
-  执行四步：市场扫描→用户选方向→深度调研→最终决策建议。
+  核心升级：集成 dispatching-parallel-agents 并行方法论 + 推荐追踪系统 + 自主学习。
 allowed-tools:
   - Read
   - Write
@@ -13,6 +13,12 @@ allowed-tools:
   - Glob
   - WebSearch
   - WebFetch
+  - sessions_spawn
+  - sessions_send
+  - sessions_yield
+  - sessions_list
+  - Feishu_IM_Bot_SendMessage
+  - Feishu_IM_Bot_GetCurrentUserMessageList
 
 ## 搜索工具优先级
 优先使用 deep-search skill 进行深度搜索：
@@ -25,17 +31,49 @@ deep-search 不可用时降级到 web_search + web_fetch。
 
 # iOS 开发方向从零调研工作流
 
-用户没有明确 App 方向，想通过数据来决策。执行完整的四步流程。
+> ⚡ **性能 + 智能化升级**：并行执行 + 推荐追踪 + 自主学习
+
+---
+
+## Step 0：读取历史积累（学习）
+
+**目标**：在扫描之前，先知道系统已经学到了什么。
+
+### 0A. 读取推荐追踪文件
+```bash
+cat ~/Obsidian/MyKnowledge/IOS/RECOMMENDATION_TRACKER.md
+```
+
+### 0B. 提取「高置信度特征」
+从 tracker 中提取：
+- **✅ 有效的差异化标签**（用户反馈好、多次佐证）
+- **❌ 低效的差异化标签**（用户已麻木、不驱动决策）
+- **🔥 跨方向共通信号**（iOS 版本更新、政策变化等）
+
+### 0C. 注入扫描上下文
+将以上特征以「参考」形式注入到第一步扫描的 prompt 中：
+```
+【系统历史学习】
+本方向历史推荐 X 次。
+已验证有效信号：...
+已验证无效信号：...
+今日扫描请重点关注：...
+```
+
+**目的**：让调研越来越聪明，不重复已知的结论。
 
 ---
 
 ## 第一步：市场扫描（找机会地图）
 
-目标：发现 15-20 个潜在 iOS 机会方向，不限品类。
+### 1A. 环境检查
+```bash
+echo $EXA_API_KEY | head -c 8
+python3 --version
+```
+如果 EXA_API_KEY 未设置，提示用户：`export EXA_API_KEY=你的key`
 
-### 1A. 运行 hunter signal-scan
-
-参考 hunter skill 的 signal-scan，扫描以下品类（每个品类用 web_fetch/web_search 搜索）：
+### 1B. 痛点扫描
 
 **扫描品类清单（优先级排序）：**
 1. 健康与健身（Health & Fitness）
@@ -47,17 +85,21 @@ deep-search 不可用时降级到 web_search + web_fetch。
 7. 摄影与视频（Photo & Video）
 8. 饮食与营养（Food & Nutrition）
 
-**每个品类搜索：**
+**每个品类搜索（中英文各一次）：**
 ```
-"{品类} app problems reddit 2025 2026 unsolved"
+"{品类} app problems complaints reddit 2025 2026 unsolved"
 "best {品类} app ios missing features"
 "top grossing {品类} app store revenue"
-"{品类} app 差评 知乎 2025"
+"{品类} app 差评 知乎 小红书 2025"
 ```
 
-### 1B. 评分标准
+**优先关注（来自 Step 0 的高置信度特征）：**
+- "免费版形同虚设" 类问题
+- "订阅套路被扒" 类问题
+- "iOS 系统改版引发混乱" 类问题
+- 任何符合历史验证有效信号的方向
 
-对每个发现的机会方向打分：
+### 1C. 评分标准
 
 | 维度 | 1分 | 3分 | 5分 |
 |------|-----|-----|-----|
@@ -66,11 +108,12 @@ deep-search 不可用时降级到 web_search + web_fetch。
 | 付费意愿 | 免费为主 | 部分付费 | 高付费意愿 |
 | 独立开发可行性 | 需要大团队 | 小团队 | 1人可做 |
 
-### 1C. 输出机会地图
+### 1D. 输出机会地图
 
 格式：
 ```
 # iOS 机会地图
+生成时间：{YYYY-MM-DD}
 
 ## 强烈推荐（总分 ≥ 16）
 1. [方向名称] - 总分：X/20
@@ -97,20 +140,67 @@ deep-search 不可用时降级到 web_search + web_fetch。
 
 ---
 
-## 第三步：对选定方向深度调研
+## 第三步：并行深度调研（dispatching-parallel-agents 模式）
 
-对用户选择的每个方向，依次执行 `ios-market-research` skill 的完整流程：
+> ⚡ **性能优化**：遵循 dispatching-parallel-agents 原则，并行调度多个独立 subagent。
 
-1. 痛点扫描
-2. Exa 竞品研究
-3. 用户场景研究
-4. 三段式用户洞察（用户画像/痛点/痒点/爽点）
-5. 可行性评分矩阵
+### 3A. 识别独立任务域
 
-每个方向报告保存为：
+每个方向的调研是完全独立的：
+- 饮食营养 → 独立的 deep-search + 竞品研究
+- 健康健身 → 独立的 deep-search + 竞品研究
+- 财务管理 → 独立的 deep-search + 竞品研究
+
+### 3B. 构造子 agent 任务
+
+每个子 agent 的任务必须包含：
+- **具体范围**：品类名称 + 关键词 + 竞品列表
+- **明确目标**：执行完整的 ios-market-research 流程
+- **报告保存路径**：每个方向独立文件
+- **今日日期**：用于追踪
+
+### 3C. 并行 dispatch
+
+**构造示例（假设用户选了 2 个方向）**：
+
 ```
-/Users/boton/Obsidian/MyKnowledge/IOS Market Research/iOS调研-{方向名}-{YYYY-MM-DD}.md
+sessions_spawn(
+  task="
+对「{方向1名称}」iOS App 市场进行深度调研，完整执行 ios-market-research skill 流程。
+品类关键词：{关键词列表}
+竞品示例：{竞品域名}
+今日日期：{YYYY-MM-DD}
+报告保存到：~/Obsidian/MyKnowledge/IOS/IOS Market Research/iOS调研-{方向1}-{YYYY-MM-DD}.md
+",
+  runtime="subagent",
+  runTimeoutSeconds=600,
+  label="ios-research-{方向1}"
+)
+
+sessions_spawn(
+  task="
+对「{方向2名称}」iOS App 市场进行深度调研，完整执行 ios-market-research skill 流程。
+品类关键词：{关键词列表}
+竞品示例：{竞品域名}
+今日日期：{YYYY-MM-DD}
+报告保存到：~/Obsidian/MyKnowledge/IOS/IOS Market Research/iOS调研-{方向2}-{YYYY-MM-DD}.md
+",
+  runtime="subagent",
+  runTimeoutSeconds=600,
+  label="ios-research-{方向2}"
+)
 ```
+
+### 3D. 收集结果
+
+等待所有 subagent 完成（自动回调），验证各方向报告已保存。
+
+### 3E. 超时处理
+
+如果某个 subagent 超时：
+- 其他已完成的报告不受影响
+- 超时方向标记为「数据不完整」
+- 在第四步对比时降级处理
 
 ---
 
@@ -120,9 +210,10 @@ deep-search 不可用时降级到 web_search + web_fetch。
 
 ```markdown
 # iOS 开发方向最终决策报告
+生成时间：{YYYY-MM-DD}
 
 ## 调研摘要
-共调研 X 个方向，历时 X 小时
+共调研 X 个方向
 
 ## 横向对比表
 | 方向 | 市场规模 | 竞争度 | 付费意愿 | 可行性 | 总分 |
@@ -144,12 +235,134 @@ deep-search 不可用时降级到 web_search + web_fetch。
 - 冷启动策略：...
 - 变现方式：...
 
-## 时间预算
-- MVP 开发：X 周
-- 上线目标：YYYY-MM-DD
+## 今日新增信号（用于追踪）
+- {信号1}
+- {信号2}
+- {信号3}
+
+## 信号来源
+- {URL 或来源}
 ```
 
-保存到：`/Users/boton/Obsidian/MyKnowledge/IOS Market Research/iOS开发方向决策报告-{YYYY-MM-DD}.md`
+保存到：`~/Obsidian/MyKnowledge/IOS/IOS Market Research/iOS开发方向决策报告-{YYYY-MM-DD}.md`
+
+---
+
+## 第五步：更新推荐追踪
+
+读取 tracker，更新今日推荐记录。
+
+### 5A. 判断推荐状态
+
+```
+今日推荐是新方向？
+  ├─ 是 → 新增推荐条目，记录全部信息
+  └─ 否 → 更新已有条目，分析今日变化
+```
+
+### 5B. 推荐追踪文件格式
+
+如果文件不存在，创建：
+```markdown
+# iOS 推荐追踪系统
+创建时间：{YYYY-MM-DD}
+
+---
+
+## 📊 每日信号状态
+
+| 日期 | 扫描方向数 | 有无变化 | 变化类型 | 报告发送 |
+|------|-----------|---------|---------|---------|
+| {YYYY-MM-DD} | X | ... | ... | ✅/❌ |
+```
+
+### 5C. 推荐条目格式
+
+```markdown
+### {方向名称}（{YYYY-MM-DD}）
+**推荐指数**：⭐⭐⭐⭐⭐
+**热度趋势**：▲ 持续上升 / ▼ 下降 / ➡️ 持平
+
+**历史推荐记录**：
+- {历史日期1}：首次推荐，理由：...
+- {历史日期2}：重复推荐，变化：...
+
+**🔥 今日新增信号**：
+- {新增痛点/需求}
+
+**📉 减弱信号**：
+- {已解决/减弱的痛点}
+
+**💡 调研洞察**：
+{一句话总结今日调研最重要的发现}
+
+**信号来源**：
+- {来源1 URL}
+- {来源2 URL}
+```
+
+### 5D. 高置信度特征更新
+
+在 tracker 末尾追加「系统学习到的规律」：
+```markdown
+## 🧠 系统学习到的规律
+
+### ✅ 有效的差异化标签
+- {标签1}（来源：{推荐日期}）
+- {标签2}（来源：{推荐日期}）
+
+### ❌ 低效的差异化标签
+- {标签1}（来源：{推荐日期}）
+
+### 🔥 跨方向共通信号
+- {信号1}（影响：{相关方向}）
+```
+
+### 5E. 保存 tracker
+保存到：`~/Obsidian/MyKnowledge/IOS/RECOMMENDATION_TRACKER.md`
+
+---
+
+## 第六步：智能发送决策
+
+### 6A. 判断是否发送报告
+
+基于以下条件判断今日报告是否值得发送：
+
+| 触发条件 | 说明 | 发送？ |
+|---------|------|--------|
+| **新方向首次推荐** | 之前没推荐过 | ✅ |
+| **已有方向热度升级** | 新增重要信号 | ✅ |
+| **无实质变化** | 和历史记录高度重复 | ❌ |
+
+### 6B. 发送逻辑
+
+```
+有值得发的内容？
+  ├─ 是 → 生成并发送完整报告到飞书群
+  └─ 否 → 更新 tracker，记录「今日无实质变化」
+           向飞书群发送简短通知：
+           「📊 iOS 市场追踪 {YYYY-MM-DD}：今日无实质变化，已更新 tracker。
+            上次推荐：{方向}（{日期}），信心度：⭐⭐⭐⭐⭐」
+```
+
+### 6C. 发送模板（有实质变化）
+
+```
+📱 iOS 开发方向调研报告 {YYYY-MM-DD}
+
+🔍 今日推荐：{方向名称}
+💡 核心洞察：{1句话}
+
+🔥 新增信号：
+• {信号1}
+• {信号2}
+
+📈 vs 上次推荐：
+{对比说明}
+
+📄 完整报告已保存至 Obsidian
+```
 
 ---
 
@@ -161,10 +374,12 @@ deep-search 不可用时降级到 web_search + web_fetch。
 - 「帮我找 iOS 开发方向」
 - 「用数据决策 iOS 开发方向」
 - 「iOS 市场机会扫描」
+- 「做一次 iOS 市场调研」
 
-## 注意事项
+## 核心原则
 
-- 第一步完成后**必须暂停等待用户选择**，不要自动进入第三步
-- 每个方向深度调研需要 1-2 小时，提前告知用户时间
-- 所有结论必须基于真实搜索数据，不编造
-- 最终报告必须给出明确的「建议做 / 不建议做」结论，不模糊
+1. **不发则已，发则有料** — 无实质变化不发完整报告
+2. **持续学习** — 每次调研都更新 tracker 的高置信度特征
+3. **并行优先** — 多个方向并行调研，节省时间
+4. **数据真实** — 所有结论必须来自实际搜索，不编造
+5. **明确结论** — 最终报告必须给出「建议做 / 不建议做 / 调整方向」

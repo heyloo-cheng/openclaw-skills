@@ -1,0 +1,45 @@
+# 监控任务配置
+
+tasks:
+  - id: "xianyu-airpods-pro"
+    name: "闲鱼 AirPods Pro 2 监控"
+    platform: "xianyu"
+    keyword: "AirPods Pro 2 全新"
+    filters:
+      minPrice: 800
+      maxPrice: 1000
+      包邮: true
+      卖家信誉: ">=4.5星"
+    schedule: "*/10 * * * *"  # 每 10 分钟
+    enabled: true
+    
+  - id: "xianyu-xiaomi-band"
+    name: "闲鱼小米手环 8 监控"
+    platform: "xianyu"
+    keyword: "小米手环 8 NFC"
+    filters:
+      minPrice: 150
+      maxPrice: 250
+      包邮: true
+    schedule: "*/10 * * * *"
+    enabled: true
+    
+  - id: "taobao-airpods-pro"
+    name: "淘宝 AirPods Pro 2 监控"
+    platform: "taobao"
+    keyword: "AirPods Pro 2 全新"
+    filters:
+      minPrice: 800
+      maxPrice: 1000
+    schedule: "*/30 * * * *"  # 每 30 分钟
+    enabled: false  # 默认关闭，需要时启用
+    
+  - id: "pdd-xiaomi-band"
+    name: "拼多多小米手环 8 监控"
+    platform: "pinduoduo"
+    keyword: "小米手环 8 NFC"
+    filters:
+      minPrice: 150
+      maxPrice: 250
+    schedule: "*/30 * * * *"
+    enabled: false

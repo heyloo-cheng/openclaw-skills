@@ -1,0 +1,43 @@
+# 默认配置
+
+# 飞书配置
+feishu:
+  webhook: ""  # 飞书 Webhook URL
+  chat_id: ""  # 飞书群 ID
+
+# Redis 配置
+redis:
+  url: "redis://localhost:6379"
+  db: 0
+
+# API 配置
+api:
+  xianyu: "http://localhost:8080"
+  monitor: "http://localhost:8181"
+  openclaw: "http://localhost:18789"
+
+# 利润和风险阈值
+thresholds:
+  min_profit_rate: 0.3  # 最低利润率 30%
+  max_risk_score: 0.3   # 最高风险评分 0.3
+
+# 监控配置
+monitoring:
+  # 工作时间
+  working_hours:
+    start: "09:00"
+    end: "22:00"
+  
+  # 频率控制
+  frequency:
+    xianyu: 10      # 闲鱼：每 10 分钟
+    taobao: 30      # 淘宝：每 30 分钟
+    pinduoduo: 30   # 拼多多：每 30 分钟
+    zhuanzhuan: 30  # 转转：每 30 分钟
+
+# 通知配置
+notification:
+  on_found: true        # 发现商品时通知
+  on_published: true    # 发布商品时通知
+  on_order: true        # 收到订单时通知
+  on_error: true        # 错误时通知
